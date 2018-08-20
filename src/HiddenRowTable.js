@@ -36,7 +36,7 @@ export class HiddenRowTable extends Component {
     _showHiddenRowsTableColumnRenderer(list){
         const columnWidths = [200, 190, 190, 70, 40];
         let keys = Object.keys(list[0]);
-        // -2 : we dont want hexcode
+        // -2 : we dont want hexcode and misc
         let tableColumns = keys.splice(0, keys.length - 2).map((column, index) => (
             <Column
                 key={column}

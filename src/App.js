@@ -58,16 +58,21 @@ function MyCell2(props){
 class MaTable extends Component {
     constructor(props) {
         super(props);
-        this.state = ({
-            color: {},
-            removedRows: {},
-            removedCells:{},
-            removedRowsBlocks: {},
-        });
+        // dependencies of table columns
         this.key_dependencies = {Name: ["Class"], State: ["Name", "Class"]};
-        this.table_content = MaTable.getTableContent();
-        this.table_render_content = this.table_content.slice();
+        // ref popover show hidden rows
         this.hiddenRowTableRef = React.createRef();
+        // contains all table entries
+        this.table_content = MaTable.getTableContent();
+
+        this.state = ({
+            // contains information about which cells are marked
+            color: {},
+            // contains information about which cells were hidden (content signature)
+            removedCells:{},
+            // contains all table entris not hidden by the user; this list gets rendered by <Table>
+            table_render_content: this.table_content.slice(),
+        });
 
         this.setValueWithDependencies = this.setValueWithDependencies.bind(this);
         this.getValueWithDependencies = this.getValueWithDependencies.bind(this);
@@ -77,10 +82,11 @@ class MaTable extends Component {
         this._cellRenderer = this._cellRenderer.bind(this);
         this._miscCellRenderer = this._miscCellRenderer.bind(this);
         this._handleRemoveSpecificRow = this._handleRemoveSpecificRow.bind(this);
-        this._hide_row = this._hide_row.bind(this);
         this._showHiddenRowsMiscRenderer = this._showHiddenRowsMiscRenderer.bind(this);
-
-        this._handleClickTest = this._handleClickTest.bind(this);
+        this.isRowHidingContentTop = this.isRowHidingContentTop.bind(this);
+        this.getHiddenRowCount = this.getHiddenRowCount.bind(this);
+        this._handleShowMarkedRows = this._handleShowMarkedRows.bind(this);
+        this._handleShowAllRows = this._handleShowAllRows.bind(this);
     }
 
     static getTableContent(){
@@ -139,85 +145,66 @@ class MaTable extends Component {
             this.setValueWithDependencies(colors, rowData, columnName, cellData, undefined);
             this.setState({color: colors});
         } else if(type === "remove"){
-            let removedCells = this.state.removedCells;
-            let table_render_content = this.table_render_content;
+            let table_render_content = this.state.table_render_content.slice();
             let i = table_render_content.length;
+            let removedCells = this.state.removedCells;
             this.setValueWithDependencies(removedCells, rowData, columnName, cellData, 1);
             // remove rows with the same content (cellData + dependencies) from the rendered content
             while(i--){
                 if (this.getValueWithDependencies(removedCells, table_render_content[i], columnName, table_render_content[i][columnName])){
-                    this._hide_row(i, table_render_content[i]["misc"]);
+                    table_render_content.splice(i, 1);
                 }
             }
-            this.setState({removedCells: removedCells});
+            this.setState({removedCells: removedCells, table_render_content: table_render_content});
         }
     }
-
-    _hide_row(row, miscIndex) {
-        let blocks = this.state.removedRowsBlocks;
-        let table_render_content = this.table_render_content;
-
-        if (row < table_render_content.length - 1){
-            if (!blocks[miscIndex]){
-                if (blocks[table_render_content[row + 1].misc]){
-                    --blocks[table_render_content[row + 1].misc].lower;
-                } else {
-                    blocks[table_render_content[row + 1].misc] = {lower: miscIndex, upper: miscIndex + 1};
-                }
-            } else {
-                if (blocks[table_render_content[row + 1].misc]){
-                    blocks[table_render_content[row + 1].misc].lower = blocks[miscIndex].lower;
-                } else {
-                    blocks[table_render_content[row + 1].misc] = {lower: blocks[miscIndex].lower, upper: miscIndex + 1};
-                }
-                delete blocks[miscIndex];
-            }
-        } else {
-            if (!blocks[miscIndex]){
-                if (blocks[table_render_content[row - 1].misc]){
-                    blocks[table_render_content[row - 1].misc].tail = {lower: miscIndex, upper: miscIndex + 1}
-                } else {
-                    blocks[table_render_content[row - 1].misc] = {tail: {lower: miscIndex, upper: miscIndex + 1}}
-                }
-            } else {
-                if (blocks[table_render_content[row - 1].misc]){
-                    blocks[table_render_content[row - 1].misc].tail = {lower: miscIndex, upper: blocks[miscIndex].upper}
-                } else {
-                    blocks[table_render_content[row - 1].misc] = {tail: {lower: miscIndex, upper: blocks[miscIndex].upper}}
-                }
-                delete blocks[miscIndex];
-            }
-        }
-        table_render_content.splice(row, 1);
-    }
-
 
     _handleRemoveSpecificRow(miscIndex) {
-        let removedRows = this.state.removedRows;
-        removedRows[miscIndex] = 1;
-        // remove row with miscIndex (cellData of column misc) from the rendered content
-        let table_render_content = this.table_render_content;
+        let table_render_content = this.state.table_render_content.slice();
         let i = table_render_content.length;
         while(i--){
             if (miscIndex === table_render_content[i]["misc"]){
-                this._hide_row(i, miscIndex);
+                table_render_content.splice(i, 1);
                 break;
             }
         }
-        this.setState({removedRows: removedRows});
+        this.setState({table_render_content});
     }
 
-    _handleClickTest(miscIndex){
-        const keys = Object.keys(this.hiddenRowTableRef.current.checked);
+    _handleShowMarkedRows(rowIndex, miscIndex){
+        let table_render_content = this.state.table_render_content.slice();
+        const keys = Object.keys(this.hiddenRowTableRef.current.checked).map(value => parseInt(value, 10)).sort((a, b) => b - a);
         keys.forEach(key => {
-            const rowIndex = parseInt(this.state.removedRowsBlocks[miscIndex].lower, 10) + parseInt(key, 10);
-            if (!isNaN(rowIndex)){
-                //todo
-            }
+            const tmp = miscIndex - this.getHiddenRowCount(rowIndex, miscIndex) + key;
+            table_render_content.splice(rowIndex, 0, this.table_content[tmp]);
         });
+        this.setState({table_render_content});
     }
 
-    _showHiddenRowsMiscRenderer(miscIndex){
+    _handleShowAllRows(rowIndex, miscIndex){
+        let table_render_content = this.state.table_render_content.slice();
+        let tmp = miscIndex - this.getHiddenRowCount(rowIndex, miscIndex);
+        for(let i = miscIndex - 1; i >= tmp; i--){
+            table_render_content.splice(rowIndex, 0, this.table_content[i]);
+        }
+        this.setState({table_render_content});
+    }
+
+    isRowHidingContentTop(row, miscIndex){
+        if (row === 0){
+            return miscIndex !== 0;
+        }
+        return miscIndex - this.state.table_render_content[row - 1]["misc"] - 1 !== 0;
+    }
+
+    getHiddenRowCount(row, miscIndex){
+        if (row === 0){
+            return miscIndex;
+        }
+        return miscIndex - this.state.table_render_content[row - 1]["misc"] - 1;
+    }
+
+    _showHiddenRowsMiscRenderer(row, miscIndex){
         return (
             <Popover lazy={true} position={"left"}>
                 <Tooltip content={"Show previously hidden rows"}>
@@ -230,8 +217,8 @@ class MaTable extends Component {
                         height={170}
                         headerHeight={20}
                         rowHeight={30}
-                        rowCount={this.state.removedRowsBlocks[miscIndex].upper - this.state.removedRowsBlocks[miscIndex].lower}
-                        rowGetter={({ index }) => this.table_content[index + this.state.removedRowsBlocks[miscIndex].lower]}
+                        rowCount={this.getHiddenRowCount(row, miscIndex)}
+                        rowGetter={({ index }) => this.table_content[miscIndex - this.getHiddenRowCount(row, miscIndex) + index]}
                         rowStyle={{alignItems: "stretch"}}
                         overscanRowCount={15}
                         headerClassName={"table-cell"}
@@ -240,13 +227,14 @@ class MaTable extends Component {
                     >
                     </HiddenRowTable>
                     <MenuDivider/>
-                    <MenuItem text={"Show marked rows"} onClick={this._handleClickTest.bind(null, miscIndex)}/>
-                    <MenuItem text={"Show all rows"}/>
+                    <MenuItem text={"Show marked rows"} onClick={this._handleShowMarkedRows.bind(null, row, miscIndex)}/>
+                    <MenuItem text={"Show all rows"} onClick={this._handleShowAllRows.bind(null, row, miscIndex)}/>
                 </Menu>
             </Popover>
         );
     }
 
+    // renderer for the "normal" cells
     _cellRenderer({
         cellData,
         columnData,
@@ -265,6 +253,7 @@ class MaTable extends Component {
         );
     }
 
+    //renderer for the additional column "misc". contains some row interaction buttons and the "true" index of the row as cellData (often called "miscIndex")
     _miscCellRenderer({
         cellData,
         columnData,
@@ -277,7 +266,7 @@ class MaTable extends Component {
         return (
             <div className={"table-cell"}>
                 <div className={"misc-overlay"}>
-                    {this.state.removedRowsBlocks[cellData] && this._showHiddenRowsMiscRenderer(cellData)}
+                    {this.isRowHidingContentTop(rowIndex, cellData) && this._showHiddenRowsMiscRenderer(rowIndex, cellData)}
                 </div>
                 <div className={"misc-overlay"} onClick={this._handleRemoveSpecificRow.bind(null, cellData)}>
                     <Tooltip content={"Hide this specific row"}>
@@ -334,15 +323,15 @@ class MaTable extends Component {
                         height={height}
                         headerHeight={20}
                         rowHeight={30}
-                        rowCount={this.table_render_content.length}
-                        rowGetter={({ index }) => this.table_render_content[index]}
+                        rowCount={this.state.table_render_content.length}
+                        rowGetter={({ index }) => this.state.table_render_content[index]}
                         rowStyle={{alignItems: "stretch"}}
                         overscanRowCount={25}
                         scrollToIndex={this.props.scrollToIndex}
                         onScroll={this.props.onScroll}
                         overscanIndicesGetter={MaTable._overscanIndicesGetter}
                     >
-                        {this._renderColumns(this.table_render_content, 250)}
+                        {this._renderColumns(this.state.table_render_content, 250)}
                     </Table>
                 )}
             </AutoSizer>
@@ -401,6 +390,5 @@ class App extends Component {
         );
     }
 }
-
 
 export default App;
