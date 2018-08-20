@@ -1,0 +1,92 @@
+
+function MyCell(props){
+    const menu = (
+        <Menu>
+            <ColorMenu onColorMenuClick={props.onColorMenuClick.bind(null, props.value)}/>
+        </Menu>
+    );
+    return (
+        <td className={"bp3-td-popover-target"} style={{background: props.color}}>
+            <Popover content={menu} position={Position.BOTTOM_RIGHT} autoFocus={false} lazy={true}>
+                <div>{props.value}</div>
+            </Popover>
+        </td>
+    );
+}
+
+function MyRow(props) {
+    const zipped = props.columnNames.map((x, i) => [x, props.columnValues[i]]);
+    const cells = zipped.map((zip) => {
+        if (props.marked && props.marked[zip[0]] && props.marked[zip[0]][zip[1]]) {
+            return (
+                <MyCell color={props.marked[zip[0]][zip[1]]} value={zip[1]} onColorMenuClick={props.onColorMenuClick.bind(null, zip[0])} key={zip}/>
+            );
+        }
+        return (
+            <MyCell value={zip[1]} onColorMenuClick={props.onColorMenuClick.bind(null, zip[0])} key={zip}/>
+        );
+    });
+
+    return (
+        <tr>
+            {cells}
+        </tr>
+    );
+}
+
+class MyTable extends Component {
+    constructor(props) {
+        super(props);
+        this.state = ({
+           color: {},
+        });
+        this.handleColorMenuClick = this.handleColorMenuClick.bind(this);
+    }
+
+    handleColorMenuClick(column, value, color){
+        let colors = this.state.color;
+        if (this.state.color[column]){
+            colors[column][value] = color;
+        } else {
+            let tmp = {};
+            tmp[value] = color;
+            colors[column] = tmp;
+        }
+        this.setState({color: colors});
+    }
+
+    render() {
+        let arr = Array(this.props.numRows);
+        let i;
+        for (i = 0; i < this.props.numRows; i++){
+            arr[i] = i;
+        }
+        const rows = arr.map((t, i) => {
+            return <MyRow key={i} marked={this.state.color} columnNames={["A", "B"]} columnValues={[1, i]} onColorMenuClick={this.handleColorMenuClick}/>;
+        });
+
+        return (
+            <HTMLTable className={"bp3-interactive-cell"} bordered={true} small={false}>
+                <thead>
+                <tr>
+                    <th>A</th>
+                    <th>B</th>
+                </tr>
+                </thead>
+                <tbody>
+                    {rows}
+                </tbody>
+            </HTMLTable>
+        )
+    }
+}
+
+
+_updateTableRenderContent(){
+        const keys = Object.keys(this.state.removedRows);
+        console.log(keys);
+
+        let tmplist = list.filter((value, index, arr) => {
+            return !keys.includes(index.toString());
+        });
+    }

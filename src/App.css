@@ -1,0 +1,89 @@
+@import "~@blueprintjs/core/lib/css/blueprint.css";
+@import "~@blueprintjs/icons/lib/css/blueprint-icons.css";
+@import "~@blueprintjs/table/lib/css/table.css";
+@import "~react-virtualized/styles.css";
+
+.App {
+  text-align: center;
+}
+
+.windmill-view-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    justify-content: center;
+}
+
+.windmill-view-menu-container {
+    flex: 0;
+}
+
+.windmill-view-table-container {
+    flex: 1 1 auto;
+}
+
+:focus {
+    outline: 0;
+}
+
+div.ReactVirtualized__Table__rowColumn > div > div > div:hover > .hoverOverlay {
+    width: 100%;
+    height: 100%;
+    position:absolute;
+    z-index: 100;
+    background-color: rgba(191, 204, 214, 0.3);
+}
+
+div.ReactVirtualized__Table__rowColumn > div.bp3-popover-wrapper,
+div.ReactVirtualized__Table__rowColumn > div.bp3-popover-wrapper > div.bp3-popover-target {
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
+}
+
+.table-cell {
+    display: flex;
+    position: relative;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+.misc-overlay {
+    flex: 1;
+    display: flex;
+    position: relative;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+.misc-overlay:hover {
+    background-color:rgba(191, 204, 214, 0.3);
+    cursor:pointer;
+}
+
+table.bp3-html-table td.bp3-td-popover-target {
+    padding: 0;
+}
+
+table.bp3-html-table td.bp3-td-popover-target > span.bp3-popover-wrapper > span.bp3-popover-target > div {
+    padding: 11px;
+}
+
+table.bp3-html-table.bp3-small td.bp3-td-popover-target > span.bp3-popover-wrapper > span.bp3-popover-target > div {
+    padding-top:6px;
+    padding-bottom:6px;
+}
+
+table.bp3-html-table.bp3-interactive-cell tbody tr td:hover{
+    background-color:rgba(191, 204, 214, 0.3);
+    cursor:pointer;
+}
+
+div.table-cell > label.bp3-checkbox {
+    margin: 0;
+    outline: 0;
+}
