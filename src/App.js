@@ -1,6 +1,7 @@
 import React, {Component} from 'react';
 import './App.css';
-import {Tooltip, Menu, MenuDivider, MenuItem, Popover, Position, Icon, Checkbox, Colors} from '@blueprintjs/core'
+import {Classes, Tooltip, Menu, MenuDivider, MenuItem, Popover, Position, Icon, Colors, Button, Navbar, NavbarGroup, NavbarDivider} from '@blueprintjs/core'
+import {DatePicker, DateRangePicker} from "@blueprintjs/datetime"
 import {WindowScroller, Table, Column, InfiniteLoader, AutoSizer} from "react-virtualized";
 
 import {HiddenRowTable} from "./HiddenRowTable"
@@ -62,8 +63,9 @@ class MaTable extends Component {
         this.key_dependencies = {Name: ["Class"], State: ["Name", "Class"]};
         // ref popover show hidden rows
         this.hiddenRowTableRef = React.createRef();
+        this.tableRef = React.createRef();
         // contains all table entries
-        this.table_content = MaTable.getTableContent();
+        this.table_content = this.props.tableContent;
 
         this.state = ({
             // contains information about which cells are marked
@@ -74,6 +76,7 @@ class MaTable extends Component {
             table_render_content: this.table_content.slice(),
         });
 
+        this.scrollToDate = this.scrollToDate.bind(this);
         this.setValueWithDependencies = this.setValueWithDependencies.bind(this);
         this.getValueWithDependencies = this.getValueWithDependencies.bind(this);
         this.handleColorMenuClick = this.handleColorMenuClick.bind(this);
@@ -87,11 +90,56 @@ class MaTable extends Component {
         this.getHiddenRowCount = this.getHiddenRowCount.bind(this);
         this._handleShowMarkedRows = this._handleShowMarkedRows.bind(this);
         this._handleShowAllRows = this._handleShowAllRows.bind(this);
+        this._showHiddenRowsMiscRendererTail = this._showHiddenRowsMiscRendererTail.bind(this);
+        this.isRowHidingContentTail = this.isRowHidingContentTail.bind(this);
+        this.getHiddenRowCountTail = this.getHiddenRowCountTail.bind(this);
+        this._handleShowMarkedRowsTail = this._handleShowMarkedRowsTail.bind(this);
+        this._handleShowAllRowsTail = this._handleShowAllRowsTail.bind(this);
+
     }
 
     static getTableContent(){
         console.log("hello");
         return getTestData();
+    }
+
+    scrollToDate(date){
+        if (date === null) return;
+        let table_render_content = this.state.table_render_content;
+        for (let i = 0; i < table_render_content.length; i++){
+            let tmp_date = new Date(table_render_content[i]["Timestamp"]);
+            if (tmp_date >= date){
+                this.tableRef.current.scrollToRow(i);
+                return;
+            }
+        }
+    }
+
+    // this disregards previous hidden rows, they will be shown again
+    filterDates(lower, upper){
+        console.log(lower);
+        console.log(upper);
+        if (lower !== null || upper !== null) {
+            let table_render_content = this.table_content.slice();
+            if (lower !== null){
+                let i = 0;
+                while (lower > new Date(table_render_content[i]["Timestamp"])) ++i;
+                if (i > 0){
+                    console.log(i);
+                    table_render_content.splice(0, i);
+                }
+            }
+            if (upper !== null){
+                let i = table_render_content.length - 1;
+                let tmp = new Date(upper.toString());
+                tmp.setHours(24);
+                while (tmp < new Date(table_render_content[i]["Timestamp"])) --i;
+                if (i < table_render_content.length - 1){
+                    table_render_content.splice(i + 1, table_render_content.length - 1 - i);
+                }
+            }
+            this.setState({table_render_content: table_render_content, removedCells: {}});
+        }
     }
 
     setValueWithDependencies(obj, rowData, columnName, cellData, value){
@@ -234,6 +282,74 @@ class MaTable extends Component {
         );
     }
 
+    _handleShowMarkedRowsTail(rowIndex, miscIndex){
+        let table_render_content = this.state.table_render_content.slice();
+        const keys = Object.keys(this.hiddenRowTableRef.current.checked).map(value => parseInt(value, 10)).sort((a, b) => b - a);
+        keys.forEach(key => {
+            const tmp = miscIndex + 1 + key;
+            table_render_content.splice(rowIndex + 1, 0, this.table_content[tmp]);
+        });
+        this.setState({table_render_content});
+    }
+
+    _handleShowAllRowsTail(rowIndex, miscIndex){
+        let table_render_content = this.state.table_render_content.slice();
+        for(let i = this.table_content.length - 1; i > miscIndex; i--){
+            table_render_content.splice(rowIndex + 1, 0, this.table_content[i]);
+        }
+        this.setState({table_render_content});
+    }
+
+    isRowHidingContentTail(rowIndex, miscIndex){
+        const table_render_content = this.state.table_render_content;
+        if (rowIndex === table_render_content.length - 1){
+            return miscIndex !== this.table_content.length - 1;
+        }
+        // we only want to show tail hidden rows on the last row
+        return false;
+        // return this.state.table_render_content[rowIndex + 1]["misc"] - miscIndex - 1 !== 0;
+    }
+
+    getHiddenRowCountTail(rowIndex, miscIndex){
+        const table_render_content = this.state.table_render_content;
+        if (rowIndex === table_render_content.length - 1){
+            return (this.table_content.length - 1) - miscIndex;
+        }
+        // we only want to show tail hidden rows on the last row
+        return 0;
+        // return this.state.table_render_content[rowIndex + 1]["misc"] - miscIndex - 1;
+    }
+
+    _showHiddenRowsMiscRendererTail(rowIndex, miscIndex){
+        return (
+            <Popover lazy={true} position={"left"}>
+                <Tooltip content={"Show previously hidden rows"}>
+                    <Icon icon={"chevron-down"}/>
+                </Tooltip>
+                <Menu>
+                    <HiddenRowTable
+                        ref = {this.hiddenRowTableRef}
+                        width={750}
+                        height={170}
+                        headerHeight={20}
+                        rowHeight={30}
+                        rowCount={this.getHiddenRowCountTail(rowIndex, miscIndex)}
+                        rowGetter={({ index }) => this.table_content[miscIndex + 1 + index]}
+                        rowStyle={{alignItems: "stretch"}}
+                        overscanRowCount={15}
+                        headerClassName={"table-cell"}
+                        _cellRenderer = {this._cellRenderer}
+                        table_content = {this.table_content}
+                    >
+                    </HiddenRowTable>
+                    <MenuDivider/>
+                    <MenuItem text={"Show marked rows"} onClick={this._handleShowMarkedRowsTail.bind(null, rowIndex, miscIndex)}/>
+                    <MenuItem text={"Show all rows"} onClick={this._handleShowAllRowsTail.bind(null, rowIndex, miscIndex)}/>
+                </Menu>
+            </Popover>
+        );
+    }
+
     // renderer for the "normal" cells
     _cellRenderer({
         cellData,
@@ -274,6 +390,9 @@ class MaTable extends Component {
                     </Tooltip>
                 </div>
                 <div className={"misc-overlay"}>
+                    {this.isRowHidingContentTail(rowIndex, cellData) && this._showHiddenRowsMiscRendererTail(rowIndex, cellData)}
+                </div>
+                <div className={"misc-overlay"}>
                     {cellData}
                 </div>
             </div>
@@ -306,7 +425,7 @@ class MaTable extends Component {
             />
         ));
         tableColumns.push((
-            <Column key={"misc"} label={""} dataKey={"misc"} width={70} cellRenderer={this._miscCellRenderer}/>
+            <Column key={"misc"} label={""} dataKey={"misc"} width={120} cellRenderer={this._miscCellRenderer}/>
         ));
         return (
             tableColumns
@@ -319,6 +438,7 @@ class MaTable extends Component {
                 {({ height, width }) => (
                     <Table
                         id={"test"}
+                        ref={this.tableRef}
                         width={width}
                         height={height}
                         headerHeight={20}
@@ -327,8 +447,7 @@ class MaTable extends Component {
                         rowGetter={({ index }) => this.state.table_render_content[index]}
                         rowStyle={{alignItems: "stretch"}}
                         overscanRowCount={25}
-                        scrollToIndex={this.props.scrollToIndex}
-                        onScroll={this.props.onScroll}
+                        scrollToAlignment={"start"}
                         overscanIndicesGetter={MaTable._overscanIndicesGetter}
                     >
                         {this._renderColumns(this.state.table_render_content, 250)}
@@ -344,37 +463,66 @@ class WindmillView extends Component {
     constructor(props){
         super(props);
         this.state = {
-            scrollToIndex: undefined
+            scrollToIndex: undefined,
+            scrollToDate: undefined,
+            filterRange: undefined,
         };
-        this.tmp = 0;
-        this._handleScrollToRow = this._handleScrollToRow.bind(this);
+        this.tableRef = React.createRef();
         this._handleScroll = this._handleScroll.bind(this);
-    }
 
-    _handleScrollToRow() {
-        //let scrollToIndex = this.tmp++;
-        let scrollToIndex = 0;
-        this.setState({scrollToIndex});
+        this.a = getTestData();
+        this.foo = new Date(this.a[0]["Timestamp"]);
+        this.foobar = new Date(this.a[this.a.length - 1]["Timestamp"]);
     }
 
     // nötig, damit sequenzielle Aufrufe von _handleScrollToRow mit demselben Index ein rerender auslösen
     _handleScroll() {
-        let scrollToIndex = this.state.scrollToIndex;
-        if (scrollToIndex !== undefined){
-            this.setState({scrollToIndex: undefined});
+        let scrollToDate = this.state.scrollToDate;
+        if (scrollToDate !== undefined){
+            this.setState({scrollToDate: undefined});
         }
     }
 
     render() {
         return (
             <div className={"windmill-view-container"}>
-                <div className={"windmill-view-menu-container"}>
-                    <button onClick={this._handleScrollToRow}>
-                        click me
-                    </button>
-                </div>
+                <Navbar>
+                    <NavbarGroup>
+                        <Popover position={"bottom"} lazy={true}>
+                            <Button>
+                                Filter
+                            </Button>
+                            <DateRangePicker
+                                allowSingleDayRange={true}
+                                minDate={this.foo}
+                                maxDate={this.foobar}
+                                onChange={selectedDates => {
+                                    if (selectedDates[0] !== null) selectedDates[0].setHours(0);
+                                    if (selectedDates[1] !== null) selectedDates[1].setHours(0);
+                                    this.tableRef.current.filterDates(selectedDates[0], selectedDates[1]);
+                                }}/>
+                        </Popover>
+                        <Popover position={"bottom"} lazy={true}>
+                            <Button>
+                                ScrollTo
+                            </Button>
+                            <DatePicker
+                                minDate={this.foo}
+                                maxDate={this.foobar}
+                                onChange={selectedDate => {
+                                    if (selectedDate === null) return;
+                                    selectedDate.setHours(0);
+                                    this.tableRef.current.scrollToDate(selectedDate);
+                                }}
+                            />
+                        </Popover>
+                    </NavbarGroup>
+                </Navbar>
                 <div className={"windmill-view-table-container"}>
-                    <MaTable scrollToIndex={this.state.scrollToIndex} onScroll={this._handleScroll}/>
+                    <MaTable
+                        ref={this.tableRef}
+                        filterRange={this.state.filterRange}
+                        tableContent={this.a}/>
                 </div>
             </div>
         );
