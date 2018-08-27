@@ -167,7 +167,7 @@ class EventTable extends Component {
                 dataKey={column}
                 width={columnWidth}
                 cellRenderer={this.props.cellRenderer}
-                style={this.props.cellStyle}
+                style={this.cellStyle}
             />
         ));
         tableColumns.push((
@@ -177,7 +177,7 @@ class EventTable extends Component {
                 dataKey={"misc"}
                 width={120}
                 cellRenderer={this.props.miscCellRenderer}
-                style={this.props.cellStyle}/>
+                style={this.cellStyle}/>
         ));
         return (tableColumns)
     }
@@ -221,11 +221,11 @@ class WindmillView extends Component {
 
         this.tableContent = getTestData();
         this.dataRange = [
-            new Date(this.tableContent[0]["Timestamp"]),
-            new Date(this.tableContent[this.tableContent.length - 1]["Timestamp"])
+            new Date(this.table_content[0]["Timestamp"]),
+            new Date(this.table_content[this.table_content.length - 1]["Timestamp"])
         ];
         // dependencies of table columns
-        this.key_dependencies = {Name: ["Class"], State: ["Class", "Name"]};
+        this.key_dependencies = {Name: ["Class"], State: ["Name", "Class"]};
          // which color to choose for the background of a cell if no color is specified, first element has highest priority
         this.key_color_hierarchie = ["Class", "Name", "State", "HexCode", "Timestamp"];
         // this.key_color_hierarchie = ["State", "Name", "Class", "HexCode", "Timestamp"];
@@ -268,8 +268,6 @@ class WindmillView extends Component {
         this.hiddenRowsPopoverRenderer = this.hiddenRowsPopoverRenderer.bind(this);
         this.hiddenRowsPopoverRendererTail = this.hiddenRowsPopoverRendererTail.bind(this);
         this.miscCellRenderer = this.miscCellRenderer.bind(this);
-
-        this.showHiddenRowsTabsRenderer = this.showHiddenRowsTabsRenderer.bind(this);
     }
 
     setValueWithDependencies(obj, rowData, columnName, value){
@@ -433,7 +431,7 @@ class WindmillView extends Component {
                     tableRenderContent.splice(i, 1);
                 }
             }
-            this.setState({removedCells: removedCells, tableRenderContent: tableRenderContent});
+            this.setState({removedCells: removedCells, table_render_content: tableRenderContent});
         }
     }
 
@@ -443,7 +441,7 @@ class WindmillView extends Component {
                 onColorMenuClick={this.handleColorMenuClick.bind(null, rowIndex, rowData, dataKey, columnIndex, cellData)}
                 onMenuClick={this.handleCellMenuClick.bind(null, rowIndex, rowData, dataKey, columnIndex, cellData)}
                 value={cellData}
-                color={this.getCellColor(rowData, dataKey).color}
+                color={this.getCellColor().color}
             />
         );
     }
@@ -469,7 +467,7 @@ class WindmillView extends Component {
                         overscanRowCount={this.overscanCount}
                         headerClassName={"table-cell"}
                         cellRenderer = {this.cellRenderer}
-                        columnNames = {this.columnNames.slice(0, this.columnNames.length - 1)}
+                        columnNames = {this.columnNames.splice(0, this.columnNames.length - 2)}
                     >
                     </HiddenRowTable>
                     <MenuDivider/>
@@ -495,13 +493,13 @@ class WindmillView extends Component {
                         headerHeight={this.headerHeight}
                         rowHeight={this.rowHeight}
                         rowCount={this.getHiddenRowCountTail(rowIndex, miscIndex)}
-                        rowGetter={({ index }) => this.tableContent[miscIndex + 1 + index]}
+                        rowGetter={({ index }) => this.table_content[miscIndex + 1 + index]}
                         rowStyle={this.rowStyle}
                         cellStyle={this.cellStyle}
                         overscanRowCount={this.overscanCount}
                         headerClassName={"table-cell"}
                         cellRenderer = {this.cellRenderer}
-                        columnNames = {this.columnNames.slice(0, this.columnNames.length - 1)}
+                        columnNames = {this.columnNames.splice(0, this.columnNames.length - 2)}
                     >
                     </HiddenRowTable>
                     <MenuDivider/>
@@ -533,69 +531,6 @@ class WindmillView extends Component {
         );
     }
 
-    static tmp(obj, rest){
-        const keys = Object.keys(obj);
-        let foo = [];
-        for (let i = 0; i < keys.length; i++){
-            if (rest.length === 1){
-                foo.push({[rest[0]]: keys[i]});
-            } else {
-                let foobar = this.tmp(obj[keys[i]], rest.slice(1));
-                for (let j = 0; j < foobar.length; j++){
-                    foo.push({[rest[0]]: keys[i], ...foobar[j]})
-                }
-            }
-        }
-        return foo;
-    }
-
-    showHiddenRowsTabPanelRenderer(column){
-        const hiddenSignatures = this.state.removedCells[column];
-        let render_list = undefined;
-        let foo = undefined;
-        if (hiddenSignatures){
-            let columns = undefined;
-            if (this.key_dependencies[column]) columns = [...this.key_dependencies[column], column];
-            else columns = [column];
-            render_list = WindmillView.tmp(hiddenSignatures, columns);
-            foo = columns.map(column => <Column label={column} key={column} dataKey={column} width={170} style={this.cellStyle} cellRenderer={this.cellRenderer}/>)
-        }
-        return (
-            render_list && <Table
-                headerHeight={this.headerHeight}
-                headerStyle={this.headerStyle}
-                height={170}
-                width={500}
-                rowGetter={({ index }) => render_list[index]}
-                rowHeight={this.rowHeight}
-                rowCount={render_list.length}
-                rowStyle={this.rowStyle}
-            >
-                {foo}
-            </Table>
-        )
-    }
-
-    showHiddenRowsTabsRenderer(){
-        const tabs = this.columnNames.map(column =>
-            <Tab
-                id={"windmill-view-show-hidden-rows" + column}
-                key={column}
-                title={column}
-                panel={this.showHiddenRowsTabPanelRenderer(column)}
-            />
-        );
-        return (
-            <Menu>
-                <Tabs id={"windmill-view-show-hidden-rows"}>
-                    {tabs}
-                </Tabs>
-                <MenuDivider/>
-                <Button/>
-            </Menu>
-        );
-    }
-
     render() {
         const reactDayPickerProps = {classNames: dayPickerClassNames};
         return (
@@ -622,8 +557,8 @@ class WindmillView extends Component {
                             </Button>
                             <DatePicker
                                 dayPickerProps={reactDayPickerProps}
-                                minDate={this.dataRange[0]}
-                                maxDate={this.dataRange[1]}
+                                minDate={this.foo}
+                                maxDate={this.foobar}
                                 onChange={selectedDate => {
                                     if (selectedDate === null) return;
                                     selectedDate.setHours(0);
@@ -635,7 +570,6 @@ class WindmillView extends Component {
                             <Button>
                                 Hello World
                             </Button>
-                            {this.showHiddenRowsTabsRenderer()}
                         </Popover>
                     </NavbarGroup>
                 </Navbar>
