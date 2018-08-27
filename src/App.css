@@ -26,6 +26,14 @@
 :focus {
     outline: 0;
 }
+div.ReactVirtualized__Table__headerColumn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+div.ReactVirtualized__Table__headerColumn > span {
+    display: block;
+}
 
 div.ReactVirtualized__Table__rowColumn > div > div > div:hover > .hoverOverlay {
     width: 100%;

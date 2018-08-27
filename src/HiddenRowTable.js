@@ -44,6 +44,7 @@ export class HiddenRowTable extends Component {
                 dataKey={column}
                 width={columnWidths[index]}
                 cellRenderer={this.props._cellRenderer}
+                style={{margin: "0px"}}
             />
         ));
         tableColumns.push(
@@ -52,6 +53,7 @@ export class HiddenRowTable extends Component {
                 dataKey={"misc"}
                 width={columnWidths[columnWidths.length - 1]}
                 cellRenderer={this._cellRenderer}
+                style={{margin: "0px"}}
             />
         );
         return (

@@ -1,9 +1,10 @@
 import React, {Component} from 'react';
 import './App.css';
-import {Classes, Tooltip, Menu, MenuDivider, MenuItem, Popover, Position, Icon, Colors, Button, Navbar, NavbarGroup, NavbarDivider} from '@blueprintjs/core'
+import {Tab, Tabs, Tooltip, Menu, MenuDivider, MenuItem, Popover, Position, Icon, Colors, Button, Navbar, NavbarGroup, NavbarDivider} from '@blueprintjs/core'
 import {DatePicker, DateRangePicker} from "@blueprintjs/datetime"
 import {WindowScroller, Table, Column, InfiniteLoader, AutoSizer} from "react-virtualized";
 
+import {dayPickerClassNames} from "./DayPickerClassNames"
 import {HiddenRowTable} from "./HiddenRowTable"
 import {getTestData} from "./test_data";
 
@@ -59,6 +60,10 @@ function MyCell2(props){
 class MaTable extends Component {
     constructor(props) {
         super(props);
+        // which color to choose for the background of a cell if no color is specified, first element has highest priority
+        this.key_color_hierarchie = ["Class", "Name", "State", "HexCode", "Timestamp"];
+        // this.key_color_hierarchie = ["State", "Name", "Class", "HexCode", "Timestamp"];
+
         // dependencies of table columns
         this.key_dependencies = {Name: ["Class"], State: ["Name", "Class"]};
         // ref popover show hidden rows
@@ -75,6 +80,11 @@ class MaTable extends Component {
             // contains all table entris not hidden by the user; this list gets rendered by <Table>
             table_render_content: this.table_content.slice(),
         });
+
+        // scrollToDate will scroll to an index i - scrollOffset
+        this.scrollOffset = 2;
+        this.headerHeight = 30;
+        this.rowHeight = 30;
 
         this.scrollToDate = this.scrollToDate.bind(this);
         this.setValueWithDependencies = this.setValueWithDependencies.bind(this);
@@ -96,11 +106,24 @@ class MaTable extends Component {
         this._handleShowMarkedRowsTail = this._handleShowMarkedRowsTail.bind(this);
         this._handleShowAllRowsTail = this._handleShowAllRowsTail.bind(this);
 
+        this.tabsRenderer = this.tabsRenderer.bind(this);
     }
 
     static getTableContent(){
         console.log("hello");
         return getTestData();
+    }
+
+    tabsRenderer(){
+        const keys = Object.keys(this.state.removedCells);
+        const tabs = keys.map((key) => {
+            return <Tab id={"windmill-view-tabs" + key} title={key} panel={<Button/>}/>
+        });
+        return (
+            <Tabs id={"windmill-view-tabs"}>
+                {tabs}
+            </Tabs>
+        )
     }
 
     scrollToDate(date){
@@ -109,7 +132,7 @@ class MaTable extends Component {
         for (let i = 0; i < table_render_content.length; i++){
             let tmp_date = new Date(table_render_content[i]["Timestamp"]);
             if (tmp_date >= date){
-                this.tableRef.current.scrollToRow(i);
+                this.tableRef.current.scrollToRow(Math.max(0, i - this.scrollOffset));
                 return;
             }
         }
@@ -190,8 +213,19 @@ class MaTable extends Component {
     handleMenuClick(row, rowData, columnName, columnIndex, cellData, type){
         if (type === "eraser") {
             let colors = this.state.color;
-            this.setValueWithDependencies(colors, rowData, columnName, cellData, undefined);
-            this.setState({color: colors});
+            if (this.getValueWithDependencies(colors, rowData, columnName, cellData) !== undefined) {
+                this.setValueWithDependencies(colors, rowData, columnName, cellData, undefined);
+            } else {
+                for (let i = 0; i < this.key_color_hierarchie.length; i++) {
+                    let dataKey = this.key_color_hierarchie[i];
+                    let color = this.getValueWithDependencies(this.state.color, rowData, dataKey, rowData[dataKey]);
+                    if (color !== undefined) {
+                        this.setValueWithDependencies(this.state.color, rowData, dataKey, rowData[dataKey], undefined);
+                        break;
+                    }
+                }
+            }
+            this.setState({color: colors})
         } else if(type === "remove"){
             let table_render_content = this.state.table_render_content.slice();
             let i = table_render_content.length;
@@ -263,8 +297,8 @@ class MaTable extends Component {
                         ref = {this.hiddenRowTableRef}
                         width={750}
                         height={170}
-                        headerHeight={20}
-                        rowHeight={30}
+                        headerHeight={this.headerHeight}
+                        rowHeight={this.rowHeight}
                         rowCount={this.getHiddenRowCount(row, miscIndex)}
                         rowGetter={({ index }) => this.table_content[miscIndex - this.getHiddenRowCount(row, miscIndex) + index]}
                         rowStyle={{alignItems: "stretch"}}
@@ -331,8 +365,8 @@ class MaTable extends Component {
                         ref = {this.hiddenRowTableRef}
                         width={750}
                         height={170}
-                        headerHeight={20}
-                        rowHeight={30}
+                        headerHeight={this.headerHeight}
+                        rowHeight={this.rowHeight}
                         rowCount={this.getHiddenRowCountTail(rowIndex, miscIndex)}
                         rowGetter={({ index }) => this.table_content[miscIndex + 1 + index]}
                         rowStyle={{alignItems: "stretch"}}
@@ -360,11 +394,19 @@ class MaTable extends Component {
         rowData,
         rowIndex,
     }){
+        let color = this.getValueWithDependencies(this.state.color, rowData, dataKey, cellData);
+        if (color === undefined){
+            for (let i = 0; i < this.key_color_hierarchie.length; i++){
+                let dataKey = this.key_color_hierarchie[i];
+                color = this.getValueWithDependencies(this.state.color, rowData, dataKey, rowData[dataKey]);
+                if (color !== undefined) break;
+            }
+        }
         return (
             <MyCell2 onColorMenuClick={this.handleColorMenuClick.bind(null, rowIndex, rowData, dataKey, columnIndex, cellData)}
                      onMenuClick={this.handleMenuClick.bind(null, rowIndex, rowData, dataKey, columnIndex, cellData)}
                      value={cellData}
-                     color={this.getValueWithDependencies(this.state.color, rowData, dataKey, cellData)}
+                     color={color}
             />
         );
     }
@@ -422,10 +464,17 @@ class MaTable extends Component {
                 dataKey={column}
                 width={columnWidth}
                 cellRenderer={this._cellRenderer}
+                style={{margin: "0px"}}
             />
         ));
         tableColumns.push((
-            <Column key={"misc"} label={""} dataKey={"misc"} width={120} cellRenderer={this._miscCellRenderer}/>
+            <Column
+                key={"misc"}
+                label={""}
+                dataKey={"misc"}
+                width={120}
+                cellRenderer={this._miscCellRenderer}
+                style={{margin: "0px"}}/>
         ));
         return (
             tableColumns
@@ -437,15 +486,16 @@ class MaTable extends Component {
             <AutoSizer>
                 {({ height, width }) => (
                     <Table
+                        headerStyle={{margin: "0px"}}
                         id={"test"}
                         ref={this.tableRef}
                         width={width}
                         height={height}
-                        headerHeight={20}
-                        rowHeight={30}
+                        headerHeight={this.headerHeight}
+                        rowHeight={this.rowHeight}
                         rowCount={this.state.table_render_content.length}
                         rowGetter={({ index }) => this.state.table_render_content[index]}
-                        rowStyle={{alignItems: "stretch"}}
+                        rowStyle={{alignItems: "stretch", padding: "0 0 0 0px"}}
                         overscanRowCount={25}
                         scrollToAlignment={"start"}
                         overscanIndicesGetter={MaTable._overscanIndicesGetter}
@@ -484,6 +534,7 @@ class WindmillView extends Component {
     }
 
     render() {
+        const reactDayPickerProps = {classNames: dayPickerClassNames};
         return (
             <div className={"windmill-view-container"}>
                 <Navbar>
@@ -493,7 +544,7 @@ class WindmillView extends Component {
                                 Filter
                             </Button>
                             <DateRangePicker
-                                allowSingleDayRange={true}
+                                shortcuts={false}
                                 minDate={this.foo}
                                 maxDate={this.foobar}
                                 onChange={selectedDates => {
@@ -507,6 +558,7 @@ class WindmillView extends Component {
                                 ScrollTo
                             </Button>
                             <DatePicker
+                                dayPickerProps={reactDayPickerProps}
                                 minDate={this.foo}
                                 maxDate={this.foobar}
                                 onChange={selectedDate => {
@@ -515,6 +567,11 @@ class WindmillView extends Component {
                                     this.tableRef.current.scrollToDate(selectedDate);
                                 }}
                             />
+                        </Popover>
+                        <Popover>
+                            <Button>
+                                Hello World
+                            </Button>
                         </Popover>
                     </NavbarGroup>
                 </Navbar>
